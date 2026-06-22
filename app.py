@@ -9,123 +9,96 @@ load_dotenv()
 
 # Page configuration
 st.set_page_config(
-    page_title="AI CSV Dataset Generator",
-    page_icon="📊",
+    page_title="AI CSV Generator",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Premium UI Styling using Custom CSS
+# Minimalist UI Styling
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
-    /* Main Font Overrides */
+    /* Font Overrides */
     html, body, [class*="css"], .stApp {
-        font-family: 'Outfit', sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
-    /* Custom Header Styles */
-    .hero-container {
-        padding: 2.5rem 1.5rem;
-        background: linear-gradient(135deg, rgba(26, 21, 44, 0.9) 0%, rgba(13, 11, 23, 0.95) 100%);
-        border-radius: 20px;
-        border: 1px solid rgba(139, 92, 246, 0.2);
+    /* Minimalist Header Container */
+    .header-container {
+        padding: 2rem 0;
         margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        border-bottom: 1px solid rgba(128, 128, 128, 0.2);
     }
     
-    .hero-title {
-        background: linear-gradient(90deg, #a78bfa 0%, #ec4899 50%, #3b82f6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 3.2rem;
-        font-weight: 800;
-        margin-bottom: 0.5rem;
+    .header-title {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
         letter-spacing: -0.5px;
     }
     
-    .hero-subtitle {
-        color: #94a3b8;
-        font-size: 1.25rem;
+    .header-subtitle {
+        color: #64748b;
+        font-size: 1rem;
         font-weight: 400;
-        max-width: 700px;
-        margin: 0 auto;
-        line-height: 1.6;
+        margin: 0;
     }
     
-    /* Elegant Metric Cards */
+    /* Clean Metric Cards */
     .metric-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        padding: 1.25rem;
+        background: rgba(128, 128, 128, 0.05);
+        border: 1px solid rgba(128, 128, 128, 0.15);
+        border-radius: 8px;
+        padding: 1rem;
         text-align: center;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.2s ease;
     }
     
     .metric-card:hover {
-        transform: translateY(-3px);
-        border-color: rgba(139, 92, 246, 0.4);
-        background: rgba(139, 92, 246, 0.05);
+        border-color: rgba(99, 102, 241, 0.4);
     }
     
     .metric-val {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #f8fafc;
-        margin-bottom: 0.25rem;
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
     }
     
     .metric-label {
-        font-size: 0.85rem;
-        color: #94a3b8;
+        font-size: 0.8rem;
+        color: #64748b;
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
     
-    /* Interactive Pills */
+    /* Preset Buttons / Chips */
     .suggestion-chip {
         display: inline-block;
-        background: rgba(139, 92, 246, 0.1);
-        border: 1px solid rgba(139, 92, 246, 0.3);
-        color: #c084fc;
-        padding: 0.4rem 1rem;
-        border-radius: 50px;
-        font-size: 0.9rem;
-        margin: 0.3rem;
+        background: rgba(128, 128, 128, 0.05);
+        border: 1px solid rgba(128, 128, 128, 0.15);
+        padding: 0.35rem 0.85rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        margin: 0.25rem;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.15s ease;
     }
     
     .suggestion-chip:hover {
-        background: rgba(139, 92, 246, 0.25);
-        color: #e9d5ff;
-        border-color: rgba(139, 92, 246, 0.6);
-        transform: scale(1.03);
+        background: rgba(99, 102, 241, 0.08);
+        border-color: rgba(99, 102, 241, 0.3);
     }
     
-    /* Sidebar styling tweaks */
-    .css-163gfae {
-        background-color: #0f172a;
-    }
-    
-    /* Buttons */
+    /* Button Customizations */
     .stButton>button {
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        transition: all 0.2s ease !important;
+        border-radius: 6px !important;
+        font-weight: 500 !important;
     }
     
-    /* Status Messages */
-    .success-banner {
-        padding: 1rem;
-        background-color: rgba(16, 185, 129, 0.1);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        color: #34d399;
-        border-radius: 8px;
-        margin-bottom: 1.5rem;
+    /* Alert styling tweaks */
+    .stAlert {
+        border-radius: 6px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -138,16 +111,16 @@ if "df" not in st.session_state:
 if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = ""
 
-# Hero Section
+# Header Section
 st.markdown("""
-<div class="hero-container">
-    <h1 class="hero-title">CSV AI Generator</h1>
-    <p class="hero-subtitle">Design custom schemas and generate synthetic, realistic datasets on-demand powered by Groq's ultra-fast LLM APIs.</p>
+<div class="header-container">
+    <h1 class="header-title">AI CSV Generator</h1>
+    <p class="header-subtitle">Design schemas and generate synthetic datasets on-demand via the Groq API.</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar - Settings & Keys
-st.sidebar.markdown("### ⚙️ Engine Settings")
+# Sidebar - Configuration
+st.sidebar.markdown("### Settings")
 
 # Retrieve default API key
 default_api_key = os.getenv("GROQ_API_KEY", "")
@@ -155,7 +128,7 @@ groq_api_key = st.sidebar.text_input(
     "Groq API Key",
     type="password",
     value=default_api_key,
-    help="Enter your Groq API key. You can also define the GROQ_API_KEY environment variable in a .env file."
+    help="Enter your Groq API key. You can also define the GROQ_API_KEY variable in a local .env file."
 )
 
 model_options = [
@@ -165,43 +138,43 @@ model_options = [
     "gemma2-9b-it"
 ]
 selected_model = st.sidebar.selectbox(
-    "AI Model",
+    "Model Selection",
     options=model_options,
     index=0,
-    help="Llama 3 70B is highly recommended for creating complex schemas and logical rows. 8B models are faster but less precise."
+    help="Llama 3 70B is recommended for structured schema design and row generation."
 )
 
 batch_size = st.sidebar.slider(
-    "Generation Batch Size",
+    "Batch size",
     min_value=5,
     max_value=25,
     value=10,
     step=5,
-    help="Number of rows generated per API request. Smaller batches improve model consistency and prevent token truncation."
+    help="Number of rows generated per API request. Lower values prevent model truncation."
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
-### 💡 Best Practices
-1. Define clear columns and value descriptions.
-2. For high-quality text fields, provide explicit formatting rules (e.g. *'Format as standard email: user@domain.com'*).
-3. Use **Llama 3 70B** for schema extraction and final generation for highest consistency.
+### Best Practices
+- Describe columns and generation rules clearly.
+- Mention specific formats in descriptions (e.g. *'Format as standard email: user@domain.com'*).
+- Use Llama 3 70B for the highest structural accuracy.
 """)
 
 # Setup tabs
-tab_schema, tab_generate = st.tabs(["📋 1. Design Schema", "⚡ 2. Generate Dataset"])
+tab_schema, tab_generate = st.tabs(["1. Schema Design", "2. Data Generation"])
 
 # Check API Key
 if not groq_api_key:
-    st.info("⚠️ Please enter your Groq API Key in the sidebar to get started.")
+    st.info("Please enter your Groq API Key in the sidebar to configure the generation engine.")
 
 # TAB 1: DESIGN SCHEMA
 with tab_schema:
-    st.subheader("Define What Dataset You Need")
-    st.write("Write a description of the dataset or schema you want. The AI will analyze your query and suggest a structured schema.")
+    st.subheader("Describe your dataset")
+    st.write("Specify what columns, properties, or overall dataset you want to create. The engine will extract a starting schema.")
     
     # Prompt presets / Chips
-    st.markdown("**Or choose a quick template starter:**")
+    st.write("Dataset presets:")
     
     presets = [
         "SaaS user accounts with signup dates, emails, subscription plans, and active status",
@@ -210,7 +183,7 @@ with tab_schema:
         "Smart home IoT device logs containing device IDs, temperatures, battery status, and online alerts"
     ]
     
-    # Render suggestion chips
+    # Render suggestion chips as clean columns of buttons
     cols_chips = st.columns(len(presets))
     clicked_preset = None
     for i, preset in enumerate(presets):
@@ -221,20 +194,20 @@ with tab_schema:
 
     # Prompt text area
     user_prompt = st.text_area(
-        "Dataset Request Prompt",
+        "Dataset Generation Prompt",
         value=clicked_preset if clicked_preset else st.session_state.last_prompt,
-        placeholder="E.g., A list of 100 sales leads with company name, website, industry, contact name, email, and phone number.",
+        placeholder="E.g., A list of 100 sales leads with company name, industry, contact name, and phone number.",
         height=100
     )
     
     if user_prompt:
         st.session_state.last_prompt = user_prompt
 
-    if st.button("✨ Suggest Schema & Columns", type="primary", disabled=not groq_api_key):
+    if st.button("Generate Schema Blueprint", type="primary", disabled=not groq_api_key):
         if not user_prompt:
-            st.warning("Please type a request prompt first.")
+            st.warning("Please enter a prompt first.")
         else:
-            with st.spinner("Analyzing request and drafting schema structure..."):
+            with st.spinner("Extracting schema structure..."):
                 try:
                     generator = CsvGenerator(api_key=groq_api_key)
                     schema_suggestion = generator.suggest_schema(
@@ -242,55 +215,52 @@ with tab_schema:
                         model=selected_model
                     )
                     st.session_state.schema = schema_suggestion
-                    st.success("Successfully generated dataset schema!")
+                    st.success("Schema suggestion created.")
                 except Exception as e:
-                    st.error(f"Failed to generate schema. Please verify your Groq API key and connection. Error: {e}")
+                    st.error(f"Failed to generate schema. Please verify your connection. Error: {e}")
 
     # Display and Edit Schema
     if st.session_state.schema:
         st.markdown("---")
-        st.subheader("🔧 Customize suggested schema")
-        st.write("Edit the table below to rename columns, change data types, or refine instructions before generating rows.")
+        st.subheader("Modify schema fields")
+        st.write("Adjust column names, select data types, or edit generation instructions inside the table below.")
         
         schema = st.session_state.schema
-        
-        # Load schema into a DataFrame for easy editing in st.data_editor
         cols_list = schema.get("columns", [])
         df_cols = pd.DataFrame(cols_list)
         
-        # Make sure columns have expected keys
+        # Verify columns exist
         expected_keys = ["name", "type", "description", "examples"]
         for key in expected_keys:
             if key not in df_cols.columns:
                 df_cols[key] = ""
                 
-        # Cast examples to string for display in editor
+        # Format examples list to comma separated string for cleaner UI table view
         df_cols["examples"] = df_cols["examples"].apply(
             lambda x: ", ".join(map(str, x)) if isinstance(x, list) else str(x)
         )
         
-        # Streamlit Data Editor for direct manipulation
+        # Streamlit Data Editor
         edited_df = st.data_editor(
             df_cols,
             num_rows="dynamic",
             use_container_width=True,
             column_config={
-                "name": st.column_config.TextColumn("Column Name", required=True, help="Database-safe column name"),
+                "name": st.column_config.TextColumn("Column Name", required=True),
                 "type": st.column_config.SelectboxColumn(
                     "Data Type",
                     options=["String", "Integer", "Float", "Date", "Boolean", "Email", "Category"],
                     required=True
                 ),
-                "description": st.column_config.TextColumn("Generation Rules", required=True, width="large"),
-                "examples": st.column_config.TextColumn("Example Values", width="medium")
+                "description": st.column_config.TextColumn("Generation Instruction", required=True, width="large"),
+                "examples": st.column_config.TextColumn("Examples", width="medium")
             }
         )
         
-        # Save edits back to session state schema
-        if st.button("💾 Lock In Schema", use_container_width=True):
+        # Lock schema
+        if st.button("Apply and Lock Schema Changes", use_container_width=True):
             updated_columns = []
             for _, row in edited_df.iterrows():
-                # Split examples string back to list
                 examples_str = str(row["examples"])
                 examples_list = [x.strip() for x in examples_str.split(",") if x.strip()]
                 
@@ -302,50 +272,49 @@ with tab_schema:
                 })
                 
             st.session_state.schema["columns"] = updated_columns
-            st.toast("Schema locked in! Head over to the 'Generate Dataset' tab.", icon="🔓")
+            st.toast("Schema updated and locked. Ready for data generation.")
 
 
 # TAB 2: GENERATE & EXPORT
 with tab_generate:
     if not st.session_state.schema:
-        st.info("👈 Please define and lock in a schema in the '1. Design Schema' tab first.")
+        st.info("Please define and lock your schema in the '1. Schema Design' tab first.")
     else:
         schema = st.session_state.schema
-        st.subheader(f"Generate Rows for: {schema.get('dataset_name', 'Custom Dataset')}")
-        st.caption(schema.get("description", ""))
+        st.subheader(f"Dataset: {schema.get('dataset_name', 'Custom Dataset')}")
+        st.write(schema.get("description", ""))
         
-        # Display Schema summary cards
-        st.write("**Columns in Schema:**")
+        # Show column overview
+        st.markdown("##### Columns in Schema")
         cols_summary = st.columns(min(len(schema["columns"]), 6))
         for idx, col in enumerate(schema["columns"]):
             col_block = cols_summary[idx % 6]
             col_block.markdown(f"""
             <div class="metric-card">
                 <div class="metric-label">{col['type']}</div>
-                <div class="metric-val" style="font-size: 1.15rem; color: #a78bfa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{col['name']}</div>
-                <div style="font-size: 0.75rem; color: #64748b; height: 32px; overflow: hidden; text-overflow: ellipsis;" title="{col['description']}">{col['description']}</div>
+                <div class="metric-val" style="font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{col['name']}</div>
             </div>
             """, unsafe_allow_html=True)
             
         st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
         
-        # Generation inputs
+        # Generator controls
         col_gen_1, col_gen_2 = st.columns([1, 2])
         with col_gen_1:
             total_rows = st.number_input(
-                "Total Rows to Generate",
+                "Number of rows",
                 min_value=5,
                 max_value=1000,
                 value=50,
                 step=10,
-                help="Maximum rows to generate. Generates in chunks using your batch size configuration."
+                help="Enter total rows to generate."
             )
             
         with col_gen_2:
             st.markdown("<br>", unsafe_allow_html=True)
-            btn_generate = st.button("🚀 Begin Dataset Generation", type="primary", use_container_width=True, disabled=not groq_api_key)
+            btn_generate = st.button("Generate Dataset", type="primary", use_container_width=True, disabled=not groq_api_key)
             
-        # Generation logic
+        # Run generation
         if btn_generate:
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -354,12 +323,10 @@ with tab_generate:
                 percent = int((current / total) * 100)
                 percent = min(percent, 100)
                 progress_bar.progress(percent)
-                status_text.markdown(f"**Progress:** Generative Engine has synthesised `{current}` of `{total}` rows... ({percent}%)")
+                status_text.write(f"Synthesised {current} of {total} rows ({percent}%)")
 
             try:
                 generator = CsvGenerator(api_key=groq_api_key)
-                
-                # Perform Generation
                 df_generated = generator.generate_all(
                     schema=schema,
                     total_rows=total_rows,
@@ -369,11 +336,10 @@ with tab_generate:
                 )
                 
                 st.session_state.df = df_generated
-                status_text.markdown(f"✨ **Generation Complete!** Synthesized `{len(df_generated)}` rows successfully.")
-                st.balloons()
+                status_text.write(f"Completed. Synthesized {len(df_generated)} rows.")
                 
             except Exception as e:
-                st.error(f"Error during dataset generation: {e}")
+                st.error(f"Error during data generation: {e}")
                 
         # Data View & Export section
         if st.session_state.df is not None:
@@ -381,49 +347,47 @@ with tab_generate:
             st.markdown("---")
             
             # Show summary stats
-            st.markdown("### 📊 Dataset Overview")
+            st.subheader("Dataset Statistics")
             meta_col1, meta_col2, meta_col3 = st.columns(3)
             with meta_col1:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-val">{len(df)}</div>
-                    <div class="metric-label">Generated Rows</div>
+                    <div class="metric-label">Rows</div>
                 </div>
                 """, unsafe_allow_html=True)
             with meta_col2:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-val">{len(df.columns)}</div>
-                    <div class="metric-label">Dataset Columns</div>
+                    <div class="metric-label">Columns</div>
                 </div>
                 """, unsafe_allow_html=True)
             with meta_col3:
-                # Estimate CSV file size
                 csv_data = df.to_csv(index=False)
                 size_kb = len(csv_data.encode('utf-8')) / 1024
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-val">{size_kb:.2f} KB</div>
-                    <div class="metric-label">Estimated File Size</div>
+                    <div class="metric-label">Size</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Interactive Grid Preview
-            st.markdown("### 🔍 Dataset Preview")
+            # Data Preview
+            st.subheader("Preview")
             st.dataframe(df, use_container_width=True)
             
             # Export Options
-            st.markdown("### 📥 Download & Export")
+            st.subheader("Download Options")
             exp_col1, exp_col2 = st.columns(2)
             
             with exp_col1:
-                # CSV Download Button
                 csv_bytes = csv_data.encode('utf-8')
                 filename_csv = f"{schema.get('dataset_name', 'dataset').lower().replace(' ', '_')}.csv"
                 st.download_button(
-                    label="📥 Download CSV Dataset",
+                    label="Download CSV",
                     data=csv_bytes,
                     file_name=filename_csv,
                     mime="text/csv",
@@ -432,12 +396,11 @@ with tab_generate:
                 )
                 
             with exp_col2:
-                # JSON Download Button
                 json_data = df.to_json(orient="records", indent=2)
                 json_bytes = json_data.encode('utf-8')
                 filename_json = f"{schema.get('dataset_name', 'dataset').lower().replace(' ', '_')}.json"
                 st.download_button(
-                    label="📥 Download JSON Dataset",
+                    label="Download JSON",
                     data=json_bytes,
                     file_name=filename_json,
                     mime="application/json",
@@ -446,40 +409,37 @@ with tab_generate:
                 
             # Quick Visualizations
             st.markdown("---")
-            st.markdown("### 📈 Visual Explorer")
-            st.write("Here are quick distributions of the columns generated in your dataset.")
+            st.subheader("Distribution Analysis")
+            st.write("Visual distributions of generated fields.")
             
             # Filter categorical columns and numeric columns
             cat_cols = []
             num_cols = []
             
-            # Attempt to automatically type columns based on pandas
             for col in df.columns:
                 if pd.api.types.is_numeric_dtype(df[col]):
                     num_cols.append(col)
                 else:
-                    # Categorical if low unique count
                     if df[col].nunique() < min(len(df), 20):
                         cat_cols.append(col)
                         
-            # Plot charts
             if cat_cols or num_cols:
-                viz_tab1, viz_tab2 = st.tabs(["📊 Category Distributions", "📈 Numeric Trends"])
+                viz_tab1, viz_tab2 = st.tabs(["Categorical Fields", "Numeric Fields"])
                 
                 with viz_tab1:
                     if cat_cols:
-                        selected_cat = st.selectbox("Select Column to Chart", cat_cols)
+                        selected_cat = st.selectbox("Select column to display", cat_cols)
                         val_counts = df[selected_cat].value_counts().reset_index()
                         val_counts.columns = [selected_cat, 'Count']
                         st.bar_chart(val_counts.set_index(selected_cat))
                     else:
-                        st.info("No clear categorical fields suitable for charting.")
+                        st.info("No categorical fields suitable for charting.")
                         
                 with viz_tab2:
                     if num_cols:
-                        selected_num = st.selectbox("Select Numeric Field to Chart", num_cols)
+                        selected_num = st.selectbox("Select column to plot", num_cols)
                         st.area_chart(df[selected_num])
                     else:
-                        st.info("No numerical fields found in dataset for numerical plots.")
+                        st.info("No numeric fields found in dataset.")
             else:
-                st.info("Generate some data fields with repeating categories or numerical values to see visualizations.")
+                st.info("No suitable repeating categories or numeric fields found for automatic plotting.")
