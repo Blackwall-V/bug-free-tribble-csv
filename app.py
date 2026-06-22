@@ -3,6 +3,12 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 from src.generator import CsvGenerator
+from src.connector import (
+    test_sql_connection,
+    export_to_sql,
+    test_mongo_connection,
+    export_to_mongo
+)
 
 # Load environment variables if present
 load_dotenv()
@@ -114,8 +120,8 @@ if "last_prompt" not in st.session_state:
 # Header Section
 st.markdown("""
 <div class="header-container">
-    <h1 class="header-title">AI CSV Generator</h1>
-    <p class="header-subtitle">Design schemas and generate synthetic datasets on-demand via the Groq API.</p>
+    <h1 class="header-title">Generador de Datos Con IA</h1>
+    <p class="header-subtitle">Genera Data sintetica Para test con la API de Groq.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -128,20 +134,20 @@ groq_api_key = st.sidebar.text_input(
     "Groq API Key",
     type="password",
     value=default_api_key,
-    help="Enter your Groq API key. You can also define the GROQ_API_KEY variable in a local .env file."
+    # help="Enter your Groq API key. You can also define the GROQ_API_KEY variable in a local .env file."
 )
 
 model_options = [
-    "llama3-70b-8192",
-    "llama3-8b-8192",
-    "mixtral-8x7b-32768",
-    "gemma2-9b-it"
+    "llama-3.1-8b-instant",
+    "llama-3.3-70b-versatile",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "qwen/qwen3-32b"
 ]
 selected_model = st.sidebar.selectbox(
     "Model Selection",
     options=model_options,
     index=0,
-    help="Llama 3 70B is recommended for structured schema design and row generation."
+    # help="Llama 3 70B is recommended for structured schema design and row generation."
 )
 
 batch_size = st.sidebar.slider(
@@ -152,17 +158,17 @@ batch_size = st.sidebar.slider(
     step=5,
     help="Number of rows generated per API request. Lower values prevent model truncation."
 )
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("""
-### Best Practices
-- Describe columns and generation rules clearly.
-- Mention specific formats in descriptions (e.g. *'Format as standard email: user@domain.com'*).
-- Use Llama 3 70B for the highest structural accuracy.
-""")
+#
+# st.sidebar.markdown("---")
+# st.sidebar.markdown("""
+# ### Best Practices
+# - Describe columns and generation rules clearly.
+# - Mention specific formats in descriptions (e.g. *'Format as standard email: user@domain.com'*).
+# - Use Llama 3 70B for the highest structural accuracy.
+# """)
 
 # Setup tabs
-tab_schema, tab_generate = st.tabs(["1. Schema Design", "2. Data Generation"])
+tab_schema, tab_generate, tab_database = st.tabs(["1. Schema Design", "2. Data Generation", "3. Export to Database"])
 
 # Check API Key
 if not groq_api_key:
@@ -443,3 +449,169 @@ with tab_generate:
                         st.info("No numeric fields found in dataset.")
             else:
                 st.info("No suitable repeating categories or numeric fields found for automatic plotting.")
+
+
+# TAB 3: EXPORT TO DATABASE
+with tab_database:
+    if st.session_state.df is None:
+        st.info("Please generate your dataset in the '2. Data Generation' tab first.")
+    else:
+        st.subheader("Database Connector")
+        st.write("Export your synthesized dataset directly to a database.")
+        
+        df = st.session_state.df
+        schema = st.session_state.schema
+        
+        col_db_1, col_db_2 = st.columns([1, 2])
+        with col_db_1:
+            selected_db = st.selectbox(
+                "Database Type",
+                options=["PostgreSQL", "MySQL", "SQL Server", "MongoDB", "SQLite"],
+                help="Select the database you want to export to."
+            )
+            
+        params = {}
+        use_uri = False
+        
+        # SQLite gets its own simpler parameter input
+        if selected_db == "SQLite":
+            st.markdown("##### Connection Settings")
+            sqlite_path = st.text_input(
+                "SQLite Database Path",
+                value="local_database.db",
+                help="Provide path to the .db file. To use an in-memory database, enter ':memory:'."
+            )
+            params["sqlite_path"] = sqlite_path
+        else:
+            col_mode_1, col_mode_2 = st.columns([1, 2])
+            with col_mode_1:
+                connection_mode = st.radio(
+                    "Connection Mode",
+                    options=["Parameters", "Connection URI / Connection String"],
+                    help="Select 'Parameters' to enter host/port/credentials or 'Connection URI' to paste a single URL connection string."
+                )
+            
+            if connection_mode == "Parameters":
+                st.markdown("##### Connection Parameters")
+                col_param_1, col_param_2 = st.columns(2)
+                
+                # Default ports based on DB type
+                default_ports = {
+                    "PostgreSQL": 5432,
+                    "MySQL": 3306,
+                    "SQL Server": 1433,
+                    "MongoDB": 27017
+                }
+                default_port = default_ports.get(selected_db, 5432)
+                
+                with col_param_1:
+                    params["host"] = st.text_input("Host", value="localhost")
+                    params["username"] = st.text_input("Username", value="")
+                    
+                with col_param_2:
+                    params["port"] = st.number_input("Port", value=default_port, step=1)
+                    params["password"] = st.text_input("Password", type="password", value="")
+                
+                if selected_db == "MongoDB":
+                    params["auth_db"] = st.text_input(
+                        "Authentication Database",
+                        value="admin",
+                        help="Database to authenticate against (usually 'admin')"
+                    )
+                elif selected_db in ["PostgreSQL", "MySQL", "SQL Server"]:
+                    params["database"] = st.text_input("Database Name", value="master" if selected_db == "SQL Server" else "")
+            
+            else:
+                use_uri = True
+                st.markdown("##### Connection URL / URI")
+                
+                # Help strings for URI format
+                uri_helpers = {
+                    "PostgreSQL": "postgresql://username:password@host:port/database",
+                    "MySQL": "mysql://username:password@host:port/database",
+                    "SQL Server": "mssql://username:password@host:port/database",
+                    "MongoDB": "mongodb://username:password@host:port/database_name?authSource=admin"
+                }
+                
+                params["connection_uri"] = st.text_input(
+                    "Connection URI",
+                    placeholder=uri_helpers.get(selected_db, ""),
+                    help=f"Example format: {uri_helpers.get(selected_db, '')}"
+                )
+                
+                if selected_db == "MongoDB":
+                    # MongoDB URI doesn't force database target inside the URI for writing
+                    params["database"] = st.text_input("Database Name", value="mock_data_db")
+        
+        st.markdown("---")
+        st.markdown("##### Destination Settings")
+        
+        # Schema name derived table/collection names
+        default_name = "synthesized_dataset"
+        if schema and schema.get("dataset_name"):
+            default_name = schema["dataset_name"].lower().strip().replace(" ", "_")
+            
+        if selected_db == "MongoDB":
+            db_name_to_use = params.get("database", "mock_data_db") if use_uri else st.text_input("Database Name", value="mock_data_db")
+            collection_name = st.text_input("Collection Name", value=default_name)
+            
+            if_exists = st.selectbox(
+                "Write Behavior (If Collection Exists)",
+                options=["append", "replace", "fail"],
+                index=0,
+                help="'append': Insert records. 'replace': Clear collection before inserting. 'fail': Stop and raise error if collection has data."
+            )
+        else:
+            table_name = st.text_input("Table Name", value=default_name)
+            if_exists = st.selectbox(
+                "Write Behavior (If Table Exists)",
+                options=["append", "replace", "fail"],
+                index=0,
+                help="'append': Add rows. 'replace': Drop and recreate table. 'fail': Stop and raise error if table already exists."
+            )
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_btn_1, col_btn_2 = st.columns(2)
+        
+        with col_btn_1:
+            btn_test = st.button("Test Connection", use_container_width=True)
+        with col_btn_2:
+            btn_export = st.button("Export to Database", type="primary", use_container_width=True)
+            
+        if btn_test:
+            with st.spinner("Testing connection..."):
+                if selected_db == "MongoDB":
+                    success, msg = test_mongo_connection(params, use_uri)
+                else:
+                    success, msg = test_sql_connection(selected_db, params, use_uri)
+                
+                if success:
+                    st.success(msg)
+                else:
+                    st.error(f"Connection failed: {msg}")
+                    
+        if btn_export:
+            with st.spinner("Exporting dataset to database..."):
+                if selected_db == "MongoDB":
+                    success, msg = export_to_mongo(
+                        df=df,
+                        params=params,
+                        db_name=db_name_to_use,
+                        collection_name=collection_name,
+                        if_exists=if_exists,
+                        use_uri=use_uri
+                    )
+                else:
+                    success, msg = export_to_sql(
+                        df=df,
+                        db_type=selected_db,
+                        params=params,
+                        table_name=table_name,
+                        if_exists=if_exists,
+                        use_uri=use_uri
+                    )
+                
+                if success:
+                    st.success(msg)
+                else:
+                    st.error(f"Export failed: {msg}")

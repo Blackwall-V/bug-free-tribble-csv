@@ -38,16 +38,16 @@ Generate realistic, high-quality, diverse data. Avoid repeating the same names o
 Strictly adhere to the schema descriptions and types.
 
 You must respond with a JSON object containing a list of records under the "data" key:
-{
+{{
   "data": [
-    {
+    {{
       "column_1": value_1,
       "column_2": value_2,
       ...
-    },
+    }},
     ...
   ]
-}
+}}
 
 Generate exactly {row_count} rows.
 Ensure the output is valid JSON. Do not include any introductory or concluding text, only the raw JSON object.
