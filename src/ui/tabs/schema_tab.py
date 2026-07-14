@@ -5,11 +5,12 @@ import streamlit as st
 
 from ...config import SUPPORTED_TYPES
 from ...generator import SchemaGenerator
+from ..styles import section_header, vertical_space
 
 
 def render_schema_tab(api_key: str, model: str) -> None:
     """Render the schema design flow."""
-    st.subheader("Describe your dataset")
+    section_header("Describe your dataset")
     st.write("Specify what columns, properties, or overall dataset you want to create.")
 
     user_prompt = st.text_area(
@@ -29,6 +30,7 @@ def render_schema_tab(api_key: str, model: str) -> None:
             _run_schema_generation(api_key, model, user_prompt)
 
     if st.session_state.schema:
+        vertical_space("16")
         _render_schema_editor()
 
 
@@ -44,7 +46,7 @@ def _run_schema_generation(api_key: str, model: str, prompt: str) -> None:
 
 def _render_schema_editor() -> None:
     st.markdown("---")
-    st.subheader("Modify schema fields")
+    section_header("Modify schema fields")
 
     schema = st.session_state.schema
     cols_list = schema.get("columns", [])

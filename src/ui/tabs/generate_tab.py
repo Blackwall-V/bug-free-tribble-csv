@@ -9,6 +9,7 @@ import streamlit as st
 from ...config import IF_EXISTS_OPTIONS
 from ...generator import DataGenerator
 from ..components.db_export import render_db_export
+from ..styles import section_header, stat_caption, vertical_space
 
 
 def render_generate_tab(api_key: str, model: str, batch_size: int) -> None:
@@ -18,7 +19,7 @@ def render_generate_tab(api_key: str, model: str, batch_size: int) -> None:
         st.info("Define and lock your schema in the 'Schema Design' tab first.")
         return
 
-    st.subheader(f"Dataset: {schema.get('dataset_name', 'Custom Dataset')}")
+    section_header(f"Dataset: {schema.get('dataset_name', 'Custom Dataset')}")
     st.write(schema.get("description", ""))
 
     col_rows, col_btn = st.columns([1, 2])
@@ -27,7 +28,7 @@ def render_generate_tab(api_key: str, model: str, batch_size: int) -> None:
             "Number of rows", min_value=5, max_value=1000, value=50, step=10
         )
     with col_btn:
-        st.markdown("<br>", unsafe_allow_html=True)
+        vertical_space("8")
         clicked = st.button(
             "Generate Dataset", type="primary", use_container_width=True,
             disabled=not api_key,
@@ -74,8 +75,10 @@ def _render_data_and_export(schema, data) -> None:
     csv_data = buf.getvalue()
     size_kb = len(csv_data.encode("utf-8")) / 1024
 
-    st.caption(f"{len(data)} rows · {len(headers)} cols · {size_kb:.2f} KB")
+    stat_caption(f"{len(data)} rows · {len(headers)} cols · {size_kb:.2f} KB")
     st.dataframe(data, use_container_width=True)
+
+    vertical_space("16")
 
     base_name = schema.get("dataset_name", "dataset").lower().replace(" ", "_")
 
@@ -87,7 +90,8 @@ def _render_data_and_export(schema, data) -> None:
         use_container_width=True,
     )
 
-    st.markdown("##### Export to Database")
+    vertical_space("16")
+    section_header("Export to Database")
     render_db_export(
         schema=schema,
         data=data,

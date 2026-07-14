@@ -13,17 +13,20 @@ import streamlit as st
 
 from ...drivers import available_drivers, get_driver
 from ...drivers.base import BaseDatabaseDriver, DriverField
+from ..styles import vertical_space
 
 
 def render_db_export(schema: Dict[str, Any],
                      data: List[Dict[str, Any]],
                      default_target: str,
                      if_exists_options: Sequence[str]) -> None:
-    """Render the compact DB export block and handle the push action."""
+    """Render the compact DB export block inside a panel and handle the push action."""
     drivers = available_drivers()
     if not drivers:
         st.warning("No database drivers are registered.")
         return
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
 
     db_type = st.selectbox("Target", drivers)
     driver_cls = get_driver(db_type)
@@ -39,11 +42,15 @@ def render_db_export(schema: Dict[str, Any],
 
     if_exists = st.selectbox("If target exists", list(if_exists_options), index=0)
 
+    vertical_space("8")
+
     if st.button("Push to database", type="primary", disabled=not data):
         driver = driver_cls(params=params, use_uri=use_uri)
         ok, msg = driver.export(target=target, schema=schema, data=data,
                                 if_exists=if_exists)
         (st.success if ok else st.error)(msg)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _collect_fields(driver_cls: type, use_uri: bool) -> Dict[str, Any]:

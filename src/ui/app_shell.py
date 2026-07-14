@@ -11,6 +11,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from ..config import AppConfig
+from .styles import apply_enterprise_theme, vertical_space
 from .tabs.schema_tab import render_schema_tab
 from .tabs.generate_tab import render_generate_tab
 
@@ -26,12 +27,15 @@ def render_app(config: AppConfig | None = None) -> None:
         initial_sidebar_state=config.initial_sidebar_state,
     )
 
+    apply_enterprise_theme()
     _init_state()
 
     st.title(config.title)
     st.caption(config.caption)
 
     api_key, model, batch_size = _render_sidebar(config)
+
+    vertical_space("16")
 
     tab_schema, tab_generate = st.tabs(["Schema Design", "Data Generation"])
 
