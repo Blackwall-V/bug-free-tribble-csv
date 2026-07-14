@@ -1,155 +1,178 @@
+"""Schema suggestion and synthetic data generation via the Groq API.
+
+Classes
+-------
+SchemaGenerator  -- produces a dataset schema dict from a natural-language prompt.
+DataGenerator    -- produces list[dict] rows conforming to a schema, in batches.
+
+Logging is reconfigured to use UTF-8 streams so non-ASCII prompts (café, naïve)
+do not raise ``'ascii' codec can't encode character`` errors.
+"""
+from __future__ import annotations
+
 import json
 import logging
-from typing import Dict, List, Any, Optional
+import sys
+from typing import Any, Callable, Dict, List, Optional
+
 from groq import Groq
 
-# Configure logging
+from .config import DEFAULT_MODEL
+from .prompts import (
+    DATA_GENERATION_SYSTEM_PROMPT,
+    DATA_GENERATION_USER_PROMPT,
+    SCHEMA_SYSTEM_PROMPT,
+    SCHEMA_USER_PROMPT,
+)
+
+
+def _ensure_utf8_streams() -> None:
+    """Force stdout/stderr/logging streams to UTF-8 (errors replaced).
+
+    Streamlit / some launchers attach ASCII pipes; without this, logging a
+    prompt containing é/ç/è raises UnicodeEncodeError.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+    root = logging.getLogger()
+    for handler in root.handlers:
+        stream = getattr(handler, "stream", None)
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+_ensure_utf8_streams()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Prompt templates inline (ponytail: eliminated templates.py file to minimize files)
-SCHEMA_SYSTEM_PROMPT = """
-You are an expert data architect and data engineer.
-Your task is to design a clean relational/tabular data schema (list of columns) based on the user's natural language request.
-For the requested dataset, determine the columns, types (String|Integer|Float|Date|Boolean|Email|Category), and descriptions.
-Respond with a JSON object containing:
-{
-  "dataset_name": "Name of the dataset",
-  "description": "Brief description of what this dataset represents",
-  "columns": [
-    {"name": "col", "type": "String", "description": "generation rule", "examples": ["ex1"]}
-  ]
-}
-"""
 
-SCHEMA_USER_PROMPT = 'Request: "{prompt}"\nSuggest a schema for this dataset.'
+class SchemaGenerator:
+    """Suggest a tabular schema from a natural-language dataset prompt."""
 
-DATA_GENERATION_SYSTEM_PROMPT = """
-You are a data generation engine. Generate realistic mock data rows matching a schema.
-Respond with a JSON object containing a list of records under the "data" key:
-{"data": [{"col": "val"}]}
-Generate exactly {row_count} rows.
-"""
+    def __init__(self, api_key: str, model: str = DEFAULT_MODEL) -> None:
+        self.client = Groq(api_key=api_key)
+        self.model = model
 
-DATA_GENERATION_USER_PROMPT = """
-Schema Description: {schema_description}
-Schema Columns: {schema_json}
-Generate exactly {row_count} rows. Exclude previously generated: {exclude_context}
-"""
+    def suggest(self, user_prompt: str) -> Dict[str, Any]:
+        """Return the Groq-suggested schema as a parsed JSON dict.
 
-# ponytail: simplified CsvGenerator class to top-level functions to avoid class boilerplate
-def suggest_schema(api_key: str, user_prompt: str, model: str = "llama3-70b-8192") -> Dict[str, Any]:
-    """Suggest dataset schema using Groq."""
-    logger.info(f"Generating schema for: '{user_prompt}' using model {model}")
-    client = Groq(api_key=api_key)
-    
-    # ponytail: Groq's response_format={"type": "json_object"} ensures clean JSON,
-    # so we don't need speculative regex markdown cleaning logic.
-    chat_completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SCHEMA_SYSTEM_PROMPT},
-            {"role": "user", "content": SCHEMA_USER_PROMPT.format(prompt=user_prompt)}
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.2,
-    )
-    return json.loads(chat_completion.choices[0].message.content)
+        Raises
+        ------
+        ValueError
+            If the model returns invalid JSON or an empty response.
+        """
+        logger.info("Generating schema for %r using %s", user_prompt, self.model)
+        completion = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": SCHEMA_SYSTEM_PROMPT},
+                {"role": "user", "content": SCHEMA_USER_PROMPT.format(prompt=user_prompt)},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        content = completion.choices[0].message.content
+        if not content:
+            raise ValueError("Schema model returned an empty response.")
+        return json.loads(content)
 
-def generate_batch(
-    api_key: str,
-    schema: Dict[str, Any],
-    row_count: int,
-    model: str = "llama3-70b-8192",
-    existing_data: Optional[List[Dict[str, Any]]] = None
-) -> List[Dict[str, Any]]:
-    """Generate a single batch of mock data rows matching the schema."""
-    client = Groq(api_key=api_key)
-    exclude_context = "None"
-    if existing_data:
-        # Provide a sample of existing values to help LLM diversify
-        exclude_context = json.dumps(existing_data[-15:], indent=2)
 
-    schema_json = json.dumps(schema.get("columns", []), indent=2)
-    schema_desc = schema.get("description", "No description provided")
-    
-    chat_completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": DATA_GENERATION_SYSTEM_PROMPT.format(row_count=row_count)},
-            {"role": "user", "content": DATA_GENERATION_USER_PROMPT.format(
-                schema_description=schema_desc,
-                schema_json=schema_json,
-                row_count=row_count,
-                exclude_context=exclude_context
-            )}
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.7,
-    )
-    response_json = json.loads(chat_completion.choices[0].message.content)
-    return response_json.get("data", [])
+class DataGenerator:
+    """Generate synthetic rows conforming to a schema in batched calls."""
 
-def generate_all(
-    api_key: str,
-    schema: Dict[str, Any],
-    total_rows: int,
-    batch_size: int = 10,
-    model: str = "llama3-70b-8192",
-    progress_callback=None
-) -> List[Dict[str, Any]]:
-    """Generate complete dataset in batches and return list of dictionaries (ponytail: eliminated pandas)."""
-    all_rows = []
-    remaining = total_rows
-    
-    while remaining > 0:
-        current_batch_size = min(batch_size, remaining)
-        logger.info(f"Generating batch of {current_batch_size} rows. Remaining: {remaining}")
-        
-        try:
-            batch_rows = generate_batch(
-                api_key=api_key,
-                schema=schema,
-                row_count=current_batch_size,
-                model=model,
-                existing_data=all_rows
-            )
-            
-            if not batch_rows:
-                logger.warning("Empty batch returned, retrying once...")
-                batch_rows = generate_batch(
-                    api_key=api_key,
-                    schema=schema,
-                    row_count=current_batch_size,
-                    model=model,
-                    existing_data=all_rows
-                )
-            
-            all_rows.extend(batch_rows)
-            remaining -= len(batch_rows)
-            
-            if len(batch_rows) == 0:
-                logger.error("LLM continuously returned 0 rows. Aborting loop.")
-                break
-                
+    def __init__(self, api_key: str, model: str = DEFAULT_MODEL) -> None:
+        self.client = Groq(api_key=api_key)
+        self.model = model
+
+    def generate_batch(
+        self,
+        schema: Dict[str, Any],
+        row_count: int,
+        existing_data: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Generate a single batch of ``row_count`` rows."""
+        exclude_context: str = "None"
+        if existing_data:
+            exclude_context = json.dumps(existing_data[-15:], indent=2)
+
+        schema_json = json.dumps(schema.get("columns", []), indent=2)
+        schema_desc = schema.get("description", "No description provided")
+
+        logger.info("Generating batch of %d rows (model=%s)", row_count, self.model)
+        completion = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": DATA_GENERATION_SYSTEM_PROMPT.format(row_count=row_count),
+                },
+                {
+                    "role": "user",
+                    "content": DATA_GENERATION_USER_PROMPT.format(
+                        schema_description=schema_desc,
+                        schema_json=schema_json,
+                        row_count=row_count,
+                        exclude_context=exclude_context,
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+        )
+        content = completion.choices[0].message.content
+        response = json.loads(content) if content else {}
+        return response.get("data", [])
+
+    def generate_all(
+        self,
+        schema: Dict[str, Any],
+        total_rows: int,
+        batch_size: int = 10,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Generate ``total_rows`` rows in batches and return cleaned rows.
+
+        Rows are cleaned to contain only the schema column names, missing
+        keys default to None.
+        """
+        all_rows: List[Dict[str, Any]] = []
+        remaining = total_rows
+
+        while remaining > 0:
+            current_batch = min(batch_size, remaining)
+            try:
+                batch = self.generate_batch(schema, current_batch, all_rows)
+            except Exception as exc:
+                logger.error("Batch generation failed: %s", exc)
+                if all_rows:
+                    logger.warning("Returning partial dataset (%d rows).", len(all_rows))
+                    break
+                raise
+
+            if not batch:
+                logger.warning("Empty batch; retrying once.")
+                batch = self.generate_batch(schema, current_batch, all_rows)
+                if not batch:
+                    logger.error("LLM returned 0 rows twice. Aborting.")
+                    break
+
+            all_rows.extend(batch)
+            remaining -= len(batch)
             if progress_callback:
                 progress_callback(len(all_rows), total_rows)
-                
-        except Exception as e:
-            logger.error(f"Batch generation failed: {e}")
-            if len(all_rows) > 0:
-                logger.warning("Returning partially generated dataset due to error.")
-                break
-            else:
-                raise e
-                
-    # Clean up keys to match exactly schema column names
-    valid_columns = [col["name"] for col in schema.get("columns", [])]
-    cleaned_rows = []
-    for row in all_rows:
-        cleaned_row = {}
-        for col in valid_columns:
-            cleaned_row[col] = row.get(col, None)
-        cleaned_rows.append(cleaned_row)
-        
-    return cleaned_rows
+
+        return self._clean_rows(all_rows, schema)
+
+    @staticmethod
+    def _clean_rows(
+        rows: List[Dict[str, Any]], schema: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        valid_columns = [col["name"] for col in schema.get("columns", [])]
+        return [{col: row.get(col) for col in valid_columns} for row in rows]
