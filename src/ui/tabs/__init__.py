@@ -1,0 +1,1 @@
+"""Tab package — one module per logical tab in the app."""
